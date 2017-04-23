@@ -24,7 +24,8 @@ Using this Library
 ------------------
 This is a library, which you can use in your own code. If you are not a
 programmer, this is not for you (in that case might more be interested
-in solutions such as the [RGB Matrix][rpi-matrix-pixelpusher] implementation).
+in solutions such as the [RGB Matrix][rpi-matrix-pixelpusher] or
+the [Spixels PixelPusher][spixels-pixelpusher] implementation).
 
 All you have to do, is to include [include/pp-server.h](./include/pp-server.h),
 implement your output device, which needs to extend `pp::OutputDevice`, then
@@ -62,14 +63,17 @@ g++ my-pp-server.cc -o my-pp-server -Llib -lpixel-push-server
 ```
 
 As a general suggestion to use it in your own code is to use include this
-library as a sub-module in github
+library as a sub-module in git, e.g. here checking it out in a sub-directory
+`pp-server` in your project:
+
 
 ```
      git submodule add https://github.com/hzeller/pixelpusher-server pp-server
 ```
 
 For an example how to do this, check out the
-[RGBMatrix implementation][rpi-matrix-pixelpusher] using this library.
+[RGBMatrix implementation][rpi-matrix-pixelpusher] using this library as a
+sub-module and how it is referenced in the Makefile.
 
 #### Network UDP packet size
 The `PPOptions::udp_packet_size` parameter specifies the size of the allowed
@@ -77,13 +81,13 @@ UDP packets.
 Some network switches (and the original PixelPusher hardware) don't like
 large packets so the default is a conservative 1460 here.
 
-But since we have a lot of pixels, using the highest number possible is
+But if we have a lot of pixels, using the highest number possible is
 desirable so ideally we can transmit a full frame-buffer with one packet (use
 something like 65507 here). This works well when sending data from an application
 on your regular computer e.g. using [processing](http://processing.org/).
 
 Even if the network supports it, sometimes sending devices limit the packet
-size (e.g. iOS, 8192 seems to be the limit of packets to send; important
+size (e.g. iOS, 8192 Bytes seems to be the limit of packets to send; important
 if you use LED labs softare) so in that case, we have to
 use 8192 as `udp_packet_size`.
 
@@ -105,4 +109,5 @@ artnet-universe and the artnet-channel in the `pp::PPOptions` struct.
 [gpl]: https://www.gnu.org/licenses/gpl-3.0.txt
 [PixelPusher devices]: http://www.heroicrobotics.com/products/pixelpusher
 [rpi-matrix-pixelpusher]: https://github.com/hzeller/rpi-matrix-pixelpusher
+[spixels-pixelpusher]: https://github.com/hzeller/spixels-pixelpusher
 [artnet]: http://heroicrobotics.boards.net/thread/39/artnet-support-sacn

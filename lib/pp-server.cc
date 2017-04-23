@@ -287,8 +287,9 @@ public:
             if (buffer_bytes >= (int)sizeof(kPixelPusherCommandMagic)
                 && memcmp(buf_pos, kPixelPusherCommandMagic,
                           sizeof(kPixelPusherCommandMagic)) == 0) {
-                // Ignore pusher command.
-                //fprintf(stderr, "Ignore pusher command.\n");
+                output_->HandlePusherCommand(
+                    buf_pos + sizeof(kPixelPusherCommandMagic),
+                    buffer_bytes - sizeof(kPixelPusherCommandMagic));
                 continue;
             }
 
@@ -408,8 +409,9 @@ bool PixelPusherServer::Init(const ::pp::PPOptions &options,
             options.udp_packet_size);
     pixel_pusher_container_.base->power_total = 1;         // ?
     pixel_pusher_container_.base->update_period = 1000;   // initial assumption.
-    pixel_pusher_container_.base->controller_ordinal = 0;  // TODO: provide config
-    pixel_pusher_container_.base->group_ordinal = 0;       // TODO: provide config
+    pixel_pusher_container_.base->controller_ordinal = options.controller;
+    pixel_pusher_container_.base->group_ordinal = options.group;
+
     pixel_pusher_container_.base->my_port = kPixelPusherListenPort;
     for (int i = 0; i < number_of_strips; ++i) {
         pixel_pusher_container_.base->strip_flags[i]
@@ -452,10 +454,10 @@ static PixelPusherServer *running_instance = NULL;
 namespace pp {
 PPOptions::PPOptions()
     : network_interface("eth0"),
+      udp_packet_size(1460),
       is_logarithmic(true),
-      artnet_universe(-1),
-      artnet_channel(-1),
-      udp_packet_size(1460) {
+      group(0), controller(0),
+      artnet_universe(-1), artnet_channel(-1) {
 }
 
 bool StartPixelPusherServer(const PPOptions &options, OutputDevice *device) {

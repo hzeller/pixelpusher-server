@@ -47,7 +47,7 @@ public:
     virtual int num_pixel_per_strip() const = 0;
 
     /*
-     * The following calls will happen in sequence when a new
+     * The following three calls will happen in sequence when a new
      * data packet arrived. StartFrame() is called on arrival of the
      * packet, followed by a sequence of SetPixel() calls, followed by
      * FlushFrame().
@@ -67,18 +67,31 @@ public:
     // packet have ben SetPixel()ed.
     virtual void FlushFrame() = 0;
 
+    // Received a PixelPusher command that couldn't be handled in the server.
+    // This callback passes it through as-is in case the OutputDevice wants
+    // to deal with it.
+    virtual void HandlePusherCommand(const char *buf, size_t size) {}
+
     // TODO: possible more callbacks for more functionality.
 };
 
-// Configuration options when starting the PixelPusher server.
+// Configuration options when starting the PixelPusher server. If you don't
+// set any values here, reasonable defaults are used.
 struct PPOptions {
     PPOptions();
     // The name of the network interface, such as eth0 or wlan0
     const char *network_interface;
-    bool is_logarithmic;    // If out output is logarithymic
+    int udp_packet_size;
+
+    bool is_logarithmic;    // If out output is logarithmic
+
+    // PixelPusher group and controller
+    int group;
+    int controller;
+
+    // Artnet configuration.
     int artnet_universe;
     int artnet_channel;
-    int udp_packet_size;
 };
 
 // Start a PixelPusher server with the given options and and OutputDevice

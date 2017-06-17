@@ -60,7 +60,9 @@ static const int kDefaultUDPPacketSize = 1460;
 
 // Say we want 60Hz update and 9 packets per frame (7 strips / packet), we
 // don't really need more update rate than this.
-static const uint32_t kMinUpdatePeriodUSec = 16666 / 9;
+//static const uint32_t kMinUpdatePeriodUSec = 1000000 / 60 / 9;
+// But we don't know how many packets per frame there really will be, so...
+static const uint32_t kMinUpdatePeriodUSec = 1000000 / 60 / 16;
 
 static int64_t CurrentTimeMicros() {
     struct timeval tv;
@@ -262,12 +264,25 @@ public:
                 kPixelPusherListenPort);
         // Create an off-screen canvas to draw on, and get on-screen.
         const int all_rows = output_->num_strips();
+        
+        // Previously, output_->FlushFrame() was called after every packet.
+        // This resulting in very low frame rates with large number of pixels-per-strip
+        // on APA102.  It would be 12x worse with WS2801!
+        // Therefore, this system of determining when a frame is complete was devised.
+        // It first determines whether the client app is sending strips in ascending or
+        // descending order. Then it assumes that a frame is complete when the the order changes,
+        // and causes output_->FlushFrame() to be called.
+        int strip_indices_direction = 0;
+        int	prev_strip_index = -1;
+        int packets_since_last_flush = 0;
+        int64_t flush_usec_per_packet = 0;
+        
         while (running()) {
             ssize_t buffer_bytes = recvfrom(s, packet_buffer, kMaxUDPPacketSize,
                                             0, NULL, 0);
             if (!running())
                 break;
-            const int64_t start_time = CurrentTimeMicros();
+                
             if (buffer_bytes < 0) {
                 perror("receive problem");
                 continue;
@@ -277,6 +292,7 @@ public:
                         buffer_bytes);
             }
 
+            const int64_t packet_start_time = CurrentTimeMicros();
             const char *buf_pos = packet_buffer;
 
             uint32_t sequence;
@@ -304,18 +320,56 @@ public:
 
             const int received_strips = buffer_bytes / strip_data_len;
             const bool got_full_update = (received_strips == all_rows);
+            bool do_flush_frame = false;
+            
             output_->StartFrame(got_full_update);
-            for (int i = 0; i < received_strips; ++i) {
+            for (int i = 0; i < received_strips; ++i)
+            {
                 StripData *data = (StripData *) buf_pos;
+                int	strip_index = data->strip_index;
+                
+                if (strip_indices_direction > 0)
+                {
+                	if (strip_index < prev_strip_index)
+                	{
+                		do_flush_frame = true;
+                	}
+                }
+                else if (strip_indices_direction < 0)
+                {
+                	if (strip_index > prev_strip_index)
+                	{
+                		do_flush_frame = true;
+                	}
+                }
+               	else if (prev_strip_index >= 0)
+               	{
+               		strip_indices_direction = strip_index - prev_strip_index;
+               	}
+               	prev_strip_index = strip_index;
+
                 // Copy into frame buffer.
-                for (int x = 0; x < output_->num_pixel_per_strip(); ++x) {
-                    output_->SetPixel(data->strip_index, x, data->pixel[x]);
+                for (int x = 0; x < output_->num_pixel_per_strip(); ++x)
+                {
+                    output_->SetPixel(strip_index, x, data->pixel[x]);
                 }
                 buf_pos += strip_data_len;
             }
-            output_->FlushFrame();
-            const int64_t end_time = CurrentTimeMicros();
-            beacon_->UpdatePacketStats(sequence, end_time - start_time);
+            
+            const int64_t packet_usec = CurrentTimeMicros() - packet_start_time;
+            
+            beacon_->UpdatePacketStats(sequence, packet_usec + flush_usec_per_packet);
+            packets_since_last_flush++;
+            if (do_flush_frame)
+            {
+	            const int64_t flush_start_time = CurrentTimeMicros();
+	            output_->FlushFrame();
+	            const int64_t flush_usec = CurrentTimeMicros() - flush_start_time;
+	            
+	            flush_usec_per_packet = flush_usec / packets_since_last_flush;
+	            fprintf(stderr, "%uusec to process 1 strip, %uusec to flush\n", (int)packet_usec, (int)flush_usec);
+	            packets_since_last_flush = 0;
+	        }
         }
         delete [] packet_buffer;
     }

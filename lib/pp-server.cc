@@ -42,6 +42,11 @@
 
 using namespace pp::internal;
 
+// Whether to set the flags bits to indicate that global brightness is enabled.
+// This is wanted for APA102 but not for other chips.
+// TODO: Have the subclass of OutputDevice{} set this properly.
+#define	DO_HARDWARE_BRIGHTNESS	1
+
 static const char kNetworkInterface[] = "eth0";
 static const uint16_t kPixelPusherDiscoveryPort = 7331;
 static const uint16_t kPixelPusherListenPort = 5078;
@@ -349,9 +354,9 @@ public:
                	prev_strip_index = strip_index;
 
                 // Copy into frame buffer.
-                for (int x = 0; x < output_->num_pixel_per_strip(); ++x)
+                for (int pixel_index = 0; pixel_index < output_->num_pixel_per_strip(); ++pixel_index)
                 {
-                    output_->SetPixel(strip_index, x, data->pixel[x]);
+                    output_->SetPixel(strip_index, pixel_index, data->pixel[pixel_index]);
                 }
                 buf_pos += strip_data_len;
             }
@@ -367,7 +372,7 @@ public:
 	            const int64_t flush_usec = CurrentTimeMicros() - flush_start_time;
 	            
 	            flush_usec_per_packet = flush_usec / packets_since_last_flush;
-	            fprintf(stderr, "%uusec to process 1 strip, %uusec to flush\n", (int)packet_usec, (int)flush_usec);
+//	            fprintf(stderr, "%uusec to process 1 strip, %uusec to flush\n", (int)packet_usec, (int)flush_usec);
 	            packets_since_last_flush = 0;
 	        }
         }
@@ -467,13 +472,24 @@ bool PixelPusherServer::Init(const ::pp::PPOptions &options,
     pixel_pusher_container_.base->group_ordinal = options.group;
 
     pixel_pusher_container_.base->my_port = kPixelPusherListenPort;
-    for (int i = 0; i < number_of_strips; ++i) {
+    pixel_pusher_container_.ext.segments = 1;    // ?
+    pixel_pusher_container_.ext.power_domain = 0;
+    
+#if DO_HARDWARE_BRIGHTNESS
+    for (int i = 0; i < number_of_strips; ++i)
+    {
+        pixel_pusher_container_.base->strip_flags[i]
+            = (options.is_logarithmic ? SFLAG_LOGARITHMIC | SFLAG_BRIGHTNESS : SFLAG_BRIGHTNESS);
+    }
+    pixel_pusher_container_.ext.pusher_flags = PFLAG_GLOBALBRIGHTNESS | PFLAG_STRIPBRIGHTNESS;
+#else
+    for (int i = 0; i < number_of_strips; ++i)
+    {
         pixel_pusher_container_.base->strip_flags[i]
             = (options.is_logarithmic ? SFLAG_LOGARITHMIC : 0);
     }
     pixel_pusher_container_.ext.pusher_flags = 0;
-    pixel_pusher_container_.ext.segments = 1;    // ?
-    pixel_pusher_container_.ext.power_domain = 0;
+#endif
 
     // Create our threads.
     discovery_beacon_ = new Beacon(header_, pixel_pusher_container_);
@@ -509,7 +525,7 @@ namespace pp {
 PPOptions::PPOptions()
     : network_interface("eth0"),
       udp_packet_size(1460),
-      is_logarithmic(true),
+      is_logarithmic(false),
       group(0), controller(0),
       artnet_universe(-1), artnet_channel(-1) {
 }

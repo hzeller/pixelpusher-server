@@ -21,9 +21,24 @@
 #define SFLAG_LOGARITHMIC    (1<<2)  // LED has logarithmic response.
 #define SFLAG_MOTION         (1<<3)  // A motion controller.
 #define SFLAG_NOTIDEMPOTENT  (1<<4)  // motion controller with side-effects.
+#define	SFLAG_BRIGHTNESS	 (1<<5)  // Strip configured for hardware that supports brightness
 
 #define PFLAG_PROTECTED (1<<0) // require qualified registry.getStrips() call.
 #define PFLAG_FIXEDSIZE (1<<1) // Requires every datagram same size.
+#define PFLAG_GLOBALBRIGHTNESS 	(1<<2) // Pusher supports PPPusherCommandGlobalBrightness (NOT whether any strip supports hardware brightness)
+#define PFLAG_STRIPBRIGHTNESS	(1<<3) // Pusher supports PPPusherCommandStripBrightness (NOT whether any strip supports hardware brightness)
+#define PFLAG_GAMMATABLE		(1<<4) // Pusher supports PPPusherCommandGammaTable, and the functionality IS supported
+
+typedef enum PPPusherCommandType
+{
+	PPPusherCommandNone =				0x00,	// returned when data not present
+	PPPusherCommandReset =				0x01,
+	PPPusherCommandGlobalBrightness =	0x02,
+	PPPusherCommandWifiConfigure =		0x03,
+	PPPusherCommandLedConfigure =		0x04,
+	PPPusherCommandStripBrightness =	0x05,
+	PPPusherCommandGammaTable =			0x06,
+} PPPusherCommandType;
 
 typedef enum DeviceType {
     ETHERDREAM = 0,
@@ -46,6 +61,7 @@ struct PixelPusherBase {
     uint16_t artnet_universe;   // configured artnet starting point for this controller
     uint16_t artnet_channel;
     uint16_t my_port;
+    uint16_t padding1_;
     // The following has a dynamic length: max(8, strips_attached). So this
     // PixelPusherBase can grow beyond its limits. For the dynamic case, we
     // just allocate more and write beyond the 8
@@ -53,7 +69,7 @@ struct PixelPusherBase {
 } PACKED;
 
 struct PixelPusherExt {
-    uint16_t padding_;          // The following is read by 32+stripFlagSize
+    uint16_t padding2_;          // The following is read by 32+stripFlagSize
     uint32_t pusher_flags;      // flags for the whole pusher
     uint32_t segments;          // number of segments in each strip
     uint32_t power_domain;      // power domain of this pusher

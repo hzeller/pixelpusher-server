@@ -60,7 +60,7 @@ public:
     virtual void StartFrame(bool full_update) {}
 
     // Callback from server with a pixel.
-    virtual void SetPixel(int strip, int pixel,
+    virtual void SetPixel(uint32_t strip, uint32_t pixel,
                           const ::pp::PixelColor &col) = 0;
 
     // Called from the PixelPusher server, after all the Pixels for a received
